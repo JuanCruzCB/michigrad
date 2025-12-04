@@ -19,8 +19,8 @@ class Module:
 
     def parameters(self) -> list[Value]:
         """
-        Devuelve todos los parámetros, que están representados como
-        objetos Value, del módulo.
+        Devuelve todos los parámetros del módulo, que
+        están representados como objetos Value.
         """
         return []
 
@@ -32,9 +32,15 @@ class Neuron(Module):
 
     def __init__(self, nin: int, nonlin: bool = True) -> None:
         """
-        La neurona tiene una lista de pesos y un sesgo (bias).
-        Si nonlin es True, la neurona aplica la función de activación ReLU
-        a la salida lineal.
+        - El argumento 'nin' indica la cantidad de pesos de la neurona.
+        - El argumento 'nonlin' indica si la neurona debe aplicar o no
+        una función de activación no lineal (ReLU) a su salida, una vez
+        la ha calculado como suma ponderada de sus entradas más el sesgo.
+        - A su vez, la neurona tiene un único sesgo (bias) que se suma a la salida
+        lineal antes de aplicar la función de activación (si corresponde).
+
+        Al crearse, la neurona crea 'nin' pesos, inicializados con
+        valores aleatorios entre -1 y 1. Además, inicializa su sesgo en 0.
         """
         self.w = [Value(random.uniform(-1, 1)) for _ in range(nin)]
         self.b = Value(0)
@@ -42,20 +48,28 @@ class Neuron(Module):
 
     def __call__(self, x: list[Value]) -> Value:
         """
-        Representa el forward pass de la neurona, es decir, cómo
+        - Representa el forward pass de la neurona, es decir, cómo
         calcula su salida a partir de las entradas x.
-
-        La salida es la suma ponderada de las entradas más el sesgo. Si
-        nonlin es True, se aplica la función ReLU a la salida.
+        - El argumento 'x' es una lista de objetos Value que representan
+        las entradas a la neurona.
+        - La salida de la neurona es un objeto Value que se calcula como
+        la suma ponderada de las entradas más el sesgo. Es decir,
+        una sumatoria de cada entrada multiplicada por su peso
+        correspondiente, y al obtener la suma total, se le suma el sesgo.
+        - Si el atributo 'nonlin' es True, al resultado anterior se le
+        aplica la función de activación ReLU (Rectified Linear Unit). Si es
+        False, simplemente se devuelve el resultado.
         """
         act = sum((wi * xi for wi, xi in zip(self.w, x)), self.b)
         return act.relu() if self.nonlin else act
 
     def parameters(self) -> list[Value]:
         """
-        Devuelve una lista con todos los parámetros de la neurona.
+        Devuelve una lista de objetos Value que representan a
+        todos los parámetros de la neurona: todos sus pesos, y
+        además el sesgo.
         """
-        return [*self.w, self.b]
+        return self.w + [self.b]
 
     def __repr__(self) -> str:
         """
@@ -72,23 +86,42 @@ class Layer(Module):
 
     def __init__(self, nin: int, nout: int, **kwargs) -> None:
         """
-        La capa tiene una lista de neuronas, cada una con nin entradas y
-        nout salidas.
+        - El argumento 'nin' indica la cantidad de pesos que cada
+        neurona de la capa debe tener.
+        - El argumento 'nout' indica la cantidad de neuronas que
+        debe tener la capa.
+        - El argumento '**kwargs' permite pasar argumentos a cada
+        neurona al momento de crearlas. En este caso, el único argumento
+        adicional posible es 'nonlin', que indica si la neurona debe aplicar
+        o no una función de activación no lineal (ReLU) a su salida.
+
+        Al crearse, la capa crea 'nout' neuronas, cada una con 'nin' pesos.
         """
         self.neurons = [Neuron(nin, **kwargs) for _ in range(nout)]
 
     def __call__(self, x: list[Value]) -> Value | list[Value]:
         """
-        Representa el forward pass de la capa, es decir, cómo
+        - Representa el forward pass de la capa, es decir, cómo
         calcula su salida a partir de las entradas x.
+        - El argumento 'x' es una lista de objetos Value que representan
+        las entradas a la capa.
+        - La salida de la capa depende de la cantidad de neuronas que tenga:
+          - Si tiene una única neurona, la salida es el resultado de
+            pasarle la lista de entradas 'x' a esa neurona, lo cual es
+            un objeto Value.
+          - Si tiene más de una neurona, la salida es el resultado de
+            pasarle la lista de entradas 'x' a cada una de las
+            neuronas una por una, lo cual es una lista de objetos Value.
         """
         out = [n(x) for n in self.neurons]
         return out[0] if len(out) == 1 else out
 
     def parameters(self) -> list[Value]:
         """
-        Devuelve una lista con todos los parámetros de la capa. Para esto,
-        le pide a cada una de sus neuronas que devuelva SUS parámetros.
+        Devuelve una lista de objetos Value que representan a
+        todos los parámetros de la capa. Para esto, le pide a cada
+        una de sus neuronas que devuelva SUS parámetros y junta a todos
+        esos parámetros en una única lista.
         """
         return [p for n in self.neurons for p in n.parameters()]
 
@@ -106,28 +139,41 @@ class MLP(Module):
 
     def __init__(self, nin: int, nouts: list[int]) -> None:
         """
-        La red neuronal tiene una lista de capas.
+        - El argumento 'nin' indica la cantidad de pesos que debe tener
+        cada neurona de la PRIMERA capa de la red.
+        - El argumento 'nouts' es una lista de enteros que indica
+        la cantidad de neuronas que debe tener cada capa de la red.
+        - La red neuronal tiene una lista de capas.
         """
         sz = [nin] + nouts
         self.layers = [
-            Layer(sz[i], sz[i + 1], nonlin=i != len(nouts) - 1)
+            Layer(nin=sz[i], nout=sz[i + 1], nonlin=i != len(nouts) - 1)
             for i in range(len(nouts))
         ]
 
-    def __call__(self, x):
+    def __call__(self, x: list[Value]) -> Value | list[Value]:
         """
-        Representa el forward pass de la red neuronal, es decir, cómo
+        - Representa el forward pass de la red neuronal, es decir, cómo
         calcula su salida a partir de las entradas x.
+        - El argumento 'x' es una lista de objetos Value que representan
+        las entradas a la red neuronal.
+        - La salida de la red neuronal depende de la cantidad de capas que tenga:
+          - Si tiene una única capa, la salida es el resultado de pasarle la lista de
+            entradas 'x' a esa capa, lo cual es un objeto Value.
+          - Si tiene más de una capa, la salida es el resultado de pasarle la lista de
+            entradas 'x' a cada una de las capas una por una, lo cual es una lista de
+            objetos Value.
         """
         for layer in self.layers:
-            x = layer(x)
-        return x
+            z = layer(x)
+        return z
 
     def parameters(self) -> list[Value]:
         """
-        Devuelve una lista con todos los parámetros de la red neuronal.
-        Para esto, le pide a cada una de sus capas que devuelva SUS parámetros,
-        y cada capa le pide a cada una de sus neuronas que devuelva SUS parámetros.
+        Devuelve una lista de objetos Value que representan a
+        todos los parámetros de la red neuronal. Para esto, le pide a cada
+        una de sus capas que devuelva SUS parámetros, y junta a todos
+        esos parámetros en una única lista.
         """
         return [p for layer in self.layers for p in layer.parameters()]
 

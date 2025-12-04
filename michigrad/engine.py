@@ -22,10 +22,15 @@ class Value:
         self.data = data
         self.grad = 0
         self.name = name
-        # internal variables used for autograd graph construction
+
+        # Función que calcula el gradiente durante el backward pass.
         self._backward = lambda: None
+
+        # Conjunto de nodos padres en el grafo.
         self._prev = set(_children)
-        self._op = _op  # the op that produced this node, for graphviz / debugging / etc
+
+        # La operación que creó a este nodo. Útil para graphviz.
+        self._op = _op
 
     def __add__(self, other: "Value") -> "Value":
         """
