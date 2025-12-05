@@ -19,6 +19,16 @@ class Value:
         _op: str = "",
         name: str = "",
     ) -> None:
+        """
+        - El argumento 'data' es el valor escalar que representa este objeto Value.
+            - Puede ser un número entero o un número de punto flotante.
+        - El argumento '_children' es una tupla de objetos Value. Representan
+        a los nodos padres en el grafo.
+        - El argumento '_op' es una cadena que representa la operación que
+        creó a este nodo (+, *, etc). Útil para graphviz.
+        - El argumento 'name' es una cadena que representa el nombre
+        de este nodo. Útil para graphviz.
+        """
         self.data = data
         self.grad = 0
         self.name = name
@@ -34,10 +44,16 @@ class Value:
 
     def __add__(self, other: "Value") -> "Value":
         """
-        Define la suma entre dos objetos Value.
+        - El argumento 'other' es otro objeto Value.
+        - Define cómo se suman dos objetos Value:
+            - Se crea un nuevo objeto Value cuyo 'data' es la suma
+            de los valores de los dos objetos, y cuyos padres son
+            los dos objetos que se están sumando. La operación es "+".
+            - Se define la función _backward para calcular los gradientes
+            durante el backward pass.
         """
         other = other if isinstance(other, Value) else Value(other)
-        out = Value(self.data + other.data, (self, other), "+")
+        out = Value(data=self.data + other.data, _children=(self, other), _op="+")
 
         def _backward() -> None:
             """
@@ -52,10 +68,16 @@ class Value:
 
     def __mul__(self, other: "Value") -> "Value":
         """
-        Define la multiplicación entre dos objetos Value.
+        - El argumento 'other' es otro objeto Value.
+        - Define cómo se multiplican dos objetos Value:
+            - Se crea un nuevo objeto Value cuyo 'data' es el producto
+            de los valores de los dos objetos, y cuyos padres son
+            los dos objetos que se están multiplicando. La operación es "*".
+            - Se define la función _backward para calcular los gradientes
+            durante el backward pass.
         """
         other = other if isinstance(other, Value) else Value(other)
-        out = Value(self.data * other.data, (self, other), "*")
+        out = Value(data=self.data * other.data, _children=(self, other), _op="*")
 
         def _backward() -> None:
             """
@@ -70,16 +92,22 @@ class Value:
 
     def __pow__(self, other: float) -> "Value":
         """
-        Define la potenciación de un objeto Value.
+        - El argumento 'other' es un número entero o float.
+        - Define cómo se eleva un objeto Value a un entero o float:
+            - Se crea un nuevo objeto Value cuyo 'data' es self.data ** other.
+            La operación es "**".
+            - Se define la función _backward para calcular los gradientes
+            durante el backward pass.
         """
         assert isinstance(other, (int, float)), (
             "only supporting int/float powers for now"
         )
-        out = Value(self.data**other, (self,), f"**{other}")
+        out = Value(data=self.data**other, _children=(self,), _op=f"**{other}")
 
         def _backward() -> None:
             """
             Define el backward pass para la potenciación.
+            La derivada de x^n es n*x^(n-1).
             """
             self.grad += (other * self.data ** (other - 1)) * out.grad
 
@@ -89,13 +117,20 @@ class Value:
 
     def relu(self) -> "Value":
         """
-        Define la función ReLU (Rectified Linear Unit).
+        - Define la función ReLU (Rectified Linear Unit):
+            - Crea un nuevo objeto Value cuyo 'data' es 0 si self.data es
+            menor a cero, o self.data en caso contrario.
         """
-        out = Value(0.0 if self.data < 0 else self.data, (self,), "ReLU")
+        out = Value(
+            data=0.0 if self.data < 0 else self.data,
+            _children=(self,),
+            _op="ReLU",
+        )
 
         def _backward() -> None:
             """
             Define el backward pass para la función ReLU.
+            La derivada de ReLU es 1 si x > 0, y 0 en caso contrario.
             """
             self.grad += (out.data > 0) * out.grad
 
@@ -105,14 +140,17 @@ class Value:
 
     def exp(self) -> "Value":
         """
-        Define la función exponencial.
+        - Define la función exponencial:
+            - Crea un nuevo objeto Value cuyo 'data' es e elevado a
+            self.data.
         """
         x = self.data
-        out = Value(math.exp(x), (self,), f"e^{self.data}")
+        out = Value(data=math.exp(x), _children=(self,), _op=f"e^{self.data}")
 
         def _backward() -> None:
             """
             Define el backward pass para la función exponencial.
+            La derivada de e^x es e^x.
             """
             self.grad += out.data * out.grad
 
@@ -127,7 +165,7 @@ class Value:
         topo = []
         visited = set()
 
-        def build_topo(v) -> None:
+        def build_topo(v: Value) -> None:
             """
             Construye el orden topológico de todos los nodos en el grafo.
             """
