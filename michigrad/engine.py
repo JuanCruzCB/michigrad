@@ -58,6 +58,8 @@ class Value:
         def _backward() -> None:
             """
             Define el backward pass para la suma.
+
+            El gradiente se propaga igual a ambos padres.
             """
             self.grad += out.grad
             other.grad += out.grad
@@ -66,7 +68,7 @@ class Value:
 
         return out
 
-    def __mul__(self, other: "Value") -> "Value":
+    def __mul__(self, other: "Value | float") -> "Value":
         """
         - El argumento 'other' es otro objeto Value.
         - Define cómo se multiplican dos objetos Value:
@@ -82,6 +84,9 @@ class Value:
         def _backward() -> None:
             """
             Define el backward pass para la multiplicación.
+
+            Ejemplo: En 6 * 5, la derivada de 6 con respecto a 5 es 6,
+            y la derivada de 5 con respecto a 6 es 5.
             """
             self.grad += other.data * out.grad
             other.grad += self.data * out.grad
@@ -107,9 +112,9 @@ class Value:
         def _backward() -> None:
             """
             Define el backward pass para la potenciación.
-            La derivada de x^n es n*x^(n-1).
+            La derivada de x^n es n * x^(n - 1).
             """
-            self.grad += (other * self.data ** (other - 1)) * out.grad
+            self.grad += (other * (self.data ** (other - 1))) * out.grad
 
         out._backward = _backward
 
@@ -160,14 +165,16 @@ class Value:
 
     def backward(self) -> None:
         """
-        Realiza el backward pass a través del grafo de autograd.
+        Realiza el backward pass, empezando desde el nodo actual
+        pasando por todos los nodos padres de él en el grafo.
         """
         topo = []
         visited = set()
 
         def build_topo(v: Value) -> None:
             """
-            Construye el orden topológico de todos los nodos en el grafo.
+            Construye el orden topológico de todos los nodos en el grafo
+            de forma recursiva.
             """
             if v not in visited:
                 visited.add(v)
@@ -177,7 +184,12 @@ class Value:
 
         build_topo(self)
 
-        # go one variable at a time and apply the chain rule to get its gradient
+        # Recorremos los nodos en orden topológico inverso, es decir, primero
+        # el nodo final, que en una red neuronal es la función de pérdida,
+        # y luego todos los nodos anteriores hasta llegar finalmente a las
+        # entradas de la red.
+        # Cada Value tiene su propia función _backward que varía según
+        # qué operación fue la que lo creó.
         self.grad = 1
         for v in reversed(topo):
             v._backward()
