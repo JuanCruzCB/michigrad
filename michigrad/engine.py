@@ -143,6 +143,47 @@ class Value:
 
         return out
 
+    def tanh(self) -> "Value":
+        """
+        - Define la función tangente hiperbólica:
+            - Crea un nuevo objeto Value cuyo 'data' es la tangente
+            hiperbólica de self.data.
+        """
+        e_a_la_2x = math.e ** (2 * self.data)
+        numerador = e_a_la_2x - 1
+        denominador = e_a_la_2x + 1
+        tanh_expr = numerador / denominador
+        out = Value(data=tanh_expr, _children=(self,), _op="tanh")
+
+        def _backward() -> None:
+            """
+            Define el backward pass para la función tangente hiperbólica.
+            La derivada de tanh(x) es 1 - tanh^2(x).
+            """
+            self.grad += (1 - out.data**2) * out.grad
+
+        out._backward = _backward
+        return out
+
+    def sigmoid(self) -> "Value":
+        """
+        - Define la función sigmoide:
+            - Crea un nuevo objeto Value cuyo 'data' es la función
+            sigmoide de self.data.
+        """
+        sigm = 1 / (1 + math.exp(-self.data))
+        out = Value(data=sigm, _children=(self,), _op="sigmoid")
+
+        def _backward() -> None:
+            """
+            Define el backward pass para la función sigmoide.
+            La derivada de sigmoid(x) es sigmoid(x) * (1 - sigmoid(x)).
+            """
+            self.grad += (out.data * (1 - out.data)) * out.grad
+
+        out._backward = _backward
+        return out
+
     def exp(self) -> "Value":
         """
         - Define la función exponencial:
