@@ -30,21 +30,17 @@ class Neuron(Module):
     Representa a una neurona de una capa de la red neuronal.
     """
 
-    def __init__(self, nin: int, nonlin: bool = True) -> None:
+    def __init__(self, nin: int) -> None:
         """
         - El argumento 'nin' indica la cantidad de pesos de la neurona.
-        - El argumento 'nonlin' indica si la neurona debe aplicar o no
-        una función de activación no lineal (ReLU) a su salida, una vez
-        la ha calculado como suma ponderada de sus entradas más el sesgo.
-        - A su vez, la neurona tiene un único sesgo (bias) que se suma a la salida
-        lineal antes de aplicar la función de activación (si corresponde).
+        - A su vez, la neurona tiene un único sesgo (bias) que se
+        suma a la salida lineal.
 
         Al crearse, la neurona crea 'nin' pesos, inicializados con
         valores aleatorios entre -1 y 1. Además, inicializa su sesgo en 0.
         """
         self.w = [Value(random.uniform(-1, 1)) for _ in range(nin)]
         self.b = Value(0)
-        self.nonlin = nonlin
 
     def __call__(self, x: list[Value]) -> Value:
         """
@@ -56,12 +52,8 @@ class Neuron(Module):
         la suma ponderada de las entradas más el sesgo. Es decir,
         una sumatoria de cada entrada multiplicada por su peso
         correspondiente, y al obtener la suma total, se le suma el sesgo.
-        - Si el atributo 'nonlin' es True, al resultado anterior se le
-        aplica la función de activación ReLU (Rectified Linear Unit). Si es
-        False, simplemente se devuelve el resultado.
         """
-        act = sum((wi * xi for wi, xi in zip(self.w, x)), self.b)
-        return act.relu() if self.nonlin else act
+        return sum((wi * xi for wi, xi in zip(self.w, x)), self.b)
 
     def parameters(self) -> list[Value]:
         """
@@ -75,7 +67,64 @@ class Neuron(Module):
         """
         Representación en string de la neurona.
         """
-        return f"{'ReLU' if self.nonlin else 'Linear'}Neuron({len(self.w)})"
+        return f"{'Linear'}Neuron({len(self.w)})"
+
+
+class ReLU(Module):
+    """
+    Representa a una capa de la red neuronal que aplica la función de activación
+    ReLU a cada una de sus entradas.
+    """
+
+    def __call__(self, x: list[Value]) -> Value | list[Value]:
+        """
+        - Representa el forward pass de la capa, es decir, cómo
+        calcula su salida a partir de las entradas x.
+        - El argumento 'x' es una lista de objetos Value que representan
+        las entradas a la capa.
+        - La salida de la capa es una lista de objetos Value, donde
+        a cada entrada se le ha aplicado la función ReLU.
+        """
+        out = [xi.relu() for xi in x]
+        return out[0] if len(out) == 1 else out
+
+
+class Tanh(Module):
+    """
+    Representa a una capa de la red neuronal que aplica la función de activación
+    tangente hiperbólica (tanh) a cada una de sus entradas.
+    """
+
+    def __call__(self, x: list[Value]) -> Value | list[Value]:
+        """
+        - Representa el forward pass de la capa, es decir, cómo
+        calcula su salida a partir de las entradas x.
+        - El argumento 'x' es una lista de objetos Value que representan
+        las entradas a la capa.
+        - La salida de la capa es una lista de objetos Value, donde
+        a cada entrada se le ha aplicado la función tanh.
+        """
+        out = [xi.tanh() for xi in x]
+        return out[0] if len(out) == 1 else out
+
+
+class Sigmoid(Module):
+    """
+    Representa a una capa de la red neuronal que aplica la función de activación
+    sigmoide a cada una de sus entradas.
+    """
+
+    def __call__(self, x: list[Value]) -> Value | list[Value]:
+        """
+        - Representa el forward pass de la capa, es decir, cómo
+        calcula su salida a partir de las entradas x.
+        - El argumento 'x' es una lista de objetos Value que representan
+        las entradas a la capa.
+        - La salida de la capa es una lista de objetos Value, donde
+        a cada entrada se le ha aplicado la función sigmoide.
+        """
+        out = [xi.sigmoid() for xi in x]
+        return out[0] if len(out) == 1 else out
 
 
 class Layer(Module):
@@ -84,7 +133,7 @@ class Layer(Module):
     una o más neuronas.
     """
 
-    def __init__(self, nin: int, nout: int, **kwargs) -> None:
+    def __init__(self, nin: int, nout: int) -> None:
         """
         - El argumento 'nin' indica la cantidad de pesos que cada
         neurona de la capa debe tener.
@@ -97,7 +146,7 @@ class Layer(Module):
 
         Al crearse, la capa crea 'nout' neuronas, cada una con 'nin' pesos.
         """
-        self.neurons = [Neuron(nin, **kwargs) for _ in range(nout)]
+        self.neurons = [Neuron(nin) for _ in range(nout)]
 
     def __call__(self, x: list[Value]) -> Value | list[Value]:
         """
@@ -146,10 +195,7 @@ class MLP(Module):
         - La red neuronal tiene una lista de capas.
         """
         sz = [nin] + nouts
-        self.layers = [
-            Layer(nin=sz[i], nout=sz[i + 1], nonlin=i != len(nouts) - 1)
-            for i in range(len(nouts))
-        ]
+        self.layers = [Layer(nin=sz[i], nout=sz[i + 1]) for i in range(len(nouts))]
 
     def __call__(self, x: list[Value]) -> Value | list[Value]:
         """
